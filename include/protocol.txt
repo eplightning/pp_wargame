@@ -1,0 +1,176 @@
+1. Główna kolejka serwera
+
+Służy wyłącznie do przyjmowania połączeń, i odpowiedzi na nie (sukces lub błąd).
+Serwer powinien utworzyć kolejkę wiadomości z dowolnie wybranym kluczem (domyślnie MAINQUEUE_DEFAULT_KEY).
+Klient powinien mieć możliwość wpisania z którą kolejką chce się połączyć (również domyślnie MAINQUEUE_DEFAULT_KEY).
+
+1.1 Wiadomość JOIN (Klient -> Serwer)
+
+typedef struct mq_msg_join {
+    long id; // MAINQUEUE_MSG_JOIN
+    long request_id; // ID wiadomości jaką ma wysłać serwer
+    char preferred_seat; // preferowany numer gracza MAINQUEUE_SEAT_*
+    char player_name[33]; // NULL-terminated nazwa gracza (max 32 znaki, gdyż jeden musi być NULL-em)
+    char player_agent[33]; // NULL-terminated nazwa programu klienta (max 32 znaki, gdyż jeden musi być NULL-em)
+} mq_msg_join_t;
+
+Siedzenie (numer) gracza:
+MAINQUEUE_SEAT_FIRST - pierwszy gracz
+MAINQUEUE_SEAT_SECOND - drugi graccz
+
+Request_id jest losowo wygenerowanym przez klienta longiem w przedziale <MAINQUEUE_REQUEST_ID_MIN; Infinity).
+Serwer na komende join powinien odpowiadać poniższą wiadomością z ID wiadomości ustawionym na otrzymany request_id.
+
+1.2 Wiadomość odp. na JOIN'a (Serwer -> Klient)
+
+typedef struct mq_msg_join_ack {
+    long id; // request_id komendy join
+    int status; // MAINQUEUE_STATUS_JOIN_*
+    // poniższe pola są wypełnianie tylko w przypadku MAINQUEUE_STATUS_JOIN_OK
+    key_t client_queue; // klucz kolejki z której wiadomości odbiera klient, usuwa klient
+    key_t server_queue; // klucz kolejki z której wiadomości odbiera serwer, usuwa serwer
+    char seat; // numer gracza MAINQUEUE_SEAT_*
+} mq_msg_join_ack_t;
+
+Statusy:
+MAINQUEUE_STATUS_JOIN_OK - Gracz został przyjęty
+MAINQUEUE_STATUS_JOIN_GAME_IN_PROGRESS - Gracz został odrzucony, serwer obsługuje już inną gre
+MAINQUEUE_STATUS_JOIN_UNKNOWN - Gracz został odrzucony, przyczyna niepodana
+
+client_queue, server_queue to dowolnie wygenerowane klucze (najlepiej na podstawie klucza głównej kolejki) do kolejek ,które
+powinien utworzyć serwer przed odpowiedzią
+
+2. Właściwa komunikacja poprzez client_queue i server_queue
+
+2.1 Struktury i definicje pomocnicze
+
+Typy jednostek
+UNIT_MIN_VALUE <
+UNIT_LIGHT_INFANTRY
+UNIT_HEAVY_INFANTRY
+UNIT_HORSEMEN
+UNIT_WORKER
+> UNIT_MAX_VALUE
+
+Długość najdłuższej możliwej wiadomości wysłanej na server_queue (LENGTH to SIZE - sizeof(long), czyli dla parametru msgrcv)
+GAMEQUEUE_MAX_MESSAGE_LENGTH
+GAMEQUEUE_MAX_MESSAGE_SIZE
+
+Długość najdłuższej możliwej wiadomości wysłanej na client_queue
+GAMEQUEUE_MAX_CMD_LENGTH
+GAMEQUEUE_MAX_CMD_SIZE
+
+Struktura armii
+typedef struct war_army {
+    unsigned int light;
+    unsigned int heavy;
+    unsigned int horsemen;
+    unsigned int workers;
+} war_army_t;
+
+2.2 Komendy gracza (wysyłane na server_queue)
+
+2.2.1 Komenda treningu jednostek
+
+typedef struct cmd_msg_train {
+    long id; // GAMEQUEUE_MSG_CLIENT_CMD_TRAIN
+    int training_id; // ID treningu (potem należy go przesłać w eventach unit_trained i odpowiedzi)
+    char type; // UNIT_*
+    unsigned int count; // ilość jednostek do wytrenowania
+} cmd_msg_train_t;
+
+2.2.2 Komenda ataku
+
+typedef struct cmd_msg_attack {
+    long id; // GAMEQUEUE_MSG_CLIENT_CMD_ATTACK
+    int attack_id; // ID walki (potem należy go przesłać w eventach battle i odpowiedzi)
+    war_army_t army; // armia którą chcemy wysłać
+} cmd_msg_attack_t;
+
+2.3 Odpowiedzi na komendy gracza (wysyłane na client_queue danego gracza)
+
+2.3.1 Odpowiedź na komende treningu jednostek
+
+typedef struct cmd_msg_train_ack {
+    long id; // GAMEQUEUE_MSG_SERVER_CMD_TRAIN_ACK
+    int training_id; // ID treningu (to wyżej)
+    int status; // GAMEQUEUE_STATUS_CMD_TRAIN_*
+    int resources; // ilość surowców pozostała (łącznie)
+} cmd_msg_train_ack_t;
+
+GAMEQUEUE_STATUS_CMD_TRAIN_OK - trening zlecony pomyślnie
+GAMEQUEUE_STATUS_CMD_TRAIN_NO_RES - za mało surowców
+GAMEQUEUE_STATUS_CMD_TRAIN_UNKNOWN - każdy inny błąd
+
+2.3.2 Odpowiedź na komende ataku
+
+typedef struct cmd_msg_attack_ack {
+    long id; // GAMEQUEUE_MSG_SERVER_CMD_ATTACK_ACK
+    int attack_id; // ID walki (to wyżej)
+    int status; // GAMEQUEUE_STATUS_CMD_ATTACK_*
+    war_army_t remaining; // pozostała dostępna armia (w mieście)
+} cmd_msg_attack_ack_t;
+
+GAMEQUEUE_STATUS_CMD_ATTACK_OK - atak wysłany pomyślnie
+GAMEQUEUE_STATUS_CMD_ATTACK_NO_UNITS - niewystarczająca liczba jednostek
+GAMEQUEUE_STATUS_CMD_ATTACK_WORKERS - nie można wysłać robotników do walki
+GAMEQUEUE_STATUS_CMD_ATTACK_ALL_ZERO - wszystkie pola w army były na 0
+GAMEQUEUE_STATUS_CMD_ATTACK_UNKNOWN - błąd niewyspecifikowany (każdy inny)
+
+2.4 Wydarzenia gry (na client_queue)
+
+2.4.1 Gra rozpoczęta
+
+typedef struct event_msg_game_started {
+    long id; // GAMEQUEUE_MSG_EVENT_GAME_STARTED
+    char opponent_name[33]; // nazwa przeciwnika
+    int starting_resources; // surowce z którymi zaczyna gracz (domyślnie GAME_DEFAULT_RESOURCES)
+} event_msg_game_started_t;
+
+2.4.2 Gra zakończona
+
+typedef struct event_msg_game_finished {
+    long id; // GAMEQUEUE_MSG_EVENT_GAME_FINISHED
+    int reason; // GAME_FINISH_REASON_*
+    char win; // GAME_FINISH_WIN_*
+} event_msg_game_finished_t;
+
+GAME_FINISH_REASON_NORMAL - gra zakończona w normalny sposób
+GAME_FINISH_REASON_ERROR - gra zakończona z powodu jakiegoś błędu
+GAME_FINISH_WIN_YES - wygrałeś
+GAME_FINISH_WIN_NO - nie wygrałeś
+
+2.4.3 Przyrost surowców
+
+typedef struct event_msg_resource_gain {
+    long id; // GAMEQUEUE_MSG_EVENT_RESOURCE_GAIN
+    int resources; // ilość surowców (łączna gracza)
+} event_msg_resource_gain_t;
+
+2.4.4 Jednostka wytrenowana
+
+typedef struct event_msg_unit_trained {
+    long id; // GAMEQUEUE_MSG_EVENT_UNIT_TRAINED
+    int training_id; // ID treningu podany w komendzie train
+    char type; // UNIT_*
+    unsigned int count; // ilość dostępnych jednostek tego typu (łączna)
+} event_msg_unit_trained_t;
+
+2.4.5 Wynik bitwy
+
+typedef struct event_msg_battle {
+    long id; // GAMEQUEUE_MSG_EVENT_BATTLE
+    int attack_id; // ID ataku podany w komendzie attack
+    char type; // BATTLE_TYPE_*
+    char result; // BATTLE_RESULT_*
+    war_army_t armies[2]; // jednostki które brały udział w bitwie: armies[0] -> twoja armia, armies[1] -> armia przeciwnika
+    war_army_t losses; // poniesione straty (twojej strony)
+    war_army_t remaining; // cała armia (twoja) która pozostała i jest dostępna w mieście po zakończeniu tej walki
+    int your_score; // wynik "twoj"
+    int enemy_score; // wynik gracza drugiego
+} event_msg_battle_t;
+
+BATTLE_TYPE_ATTACK - twój atak
+BATTLE_TYPE_DEFENSE - broniłeś się
+BATTLE_RESULT_WIN - wygrałeś
+BATTLE_RESULT_LOSS - przegrałeś
