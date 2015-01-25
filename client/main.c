@@ -92,7 +92,7 @@ int establish_mq_connection()
     return mq;
 }
 
-void ask_server_to_join(int main_queue, char *player_name, char preffered_seat, mq_msg_join_ack_t *response)
+int ask_server_to_join(int main_queue, char *player_name, char preffered_seat, mq_msg_join_ack_t *response)
 {
     // na ten id odpowie nam
     long reqid = MAINQUEUE_REQUEST_ID_MIN + rand();
@@ -105,11 +105,23 @@ void ask_server_to_join(int main_queue, char *player_name, char preffered_seat, 
     strcpy(msg.player_name, player_name);
     strcpy(msg.player_agent, "wg_client 0.1");
 
+    int status;
+
     // wysylamy
-    msgsnd(main_queue, &msg, sizeof(mq_msg_join_t) - sizeof(long), 0);
+    status = msgsnd(main_queue, &msg, sizeof(mq_msg_join_t) - sizeof(long), 0);
+
+    if (status < 0) {
+        perror("Nie mozna wyslac join requesta");
+        return status;
+    }
 
     // odbieramy
-    msgrcv(main_queue, response, sizeof(mq_msg_join_ack_t) - sizeof(long), reqid, 0);
+    status = msgrcv(main_queue, response, sizeof(mq_msg_join_ack_t) - sizeof(long), reqid, 0);
+
+    if (status < 0)
+        perror("Nie mozna odebrac odpowiedzi na join requesta");
+
+    return status;
 }
 
 int main()
@@ -138,7 +150,10 @@ int main()
         if (main_queue < 0)
             continue;
 
-        ask_server_to_join(main_queue, player_name, preffered, &message);
+        int ask_status = ask_server_to_join(main_queue, player_name, preffered, &message);
+
+        if (ask_status < 0)
+            continue;
 
         if (message.status == MAINQUEUE_STATUS_JOIN_UNKNOWN) {
             printf("Serwer odrzucil nasze zadanie z powodem nieznanym\n");
