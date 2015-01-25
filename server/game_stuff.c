@@ -42,22 +42,22 @@ unsigned int attack_time()
 
 double attack_power(war_army_t *army)
 {
-    double out = 0;
+    double out = 0.0;
 
-    out += 1.5d * army->heavy;
-    out += 1.d * army->light;
-    out += 3.5d * army->horsemen;
+    out += 1.5 * army->heavy;
+    out += 1.0 * army->light;
+    out += 3.5 * army->horsemen;
 
     return out;
 }
 
 double attack_defense(war_army_t *army)
 {
-    double out = 0;
+    double out = 0.0;
 
-    out += 3.d * army->heavy;
-    out += 1.2d * army->light;
-    out += 1.2d * army->horsemen;
+    out += 3.0 * army->heavy;
+    out += 1.2 * army->light;
+    out += 1.2 * army->horsemen;
 
     return out;
 }
@@ -66,7 +66,7 @@ war_army_t attack_getloss(double ratio, war_army_t *army)
 {
     war_army_t losses;
 
-    if (ratio >= 1.d) {
+    if (ratio >= 1.0) {
         losses.workers = 0;
         losses.heavy = army->heavy;
         losses.horsemen = army->horsemen;

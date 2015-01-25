@@ -1,18 +1,20 @@
 CC=gcc
-CFLAGS=-c -Wall -std=gnu99 -I./include/
+#CC=clang
+CFLAGS=-c -O2 -Wall -std=gnu99 -I./include/
 SERVERLIBS=-lpthread -lm
-SERVERFLAGS=$(CFLAGS) -lm -lpthread -I./server/
+SERVERFLAGS=$(CFLAGS) -I./server/
 CLIENTLIBS=-lncurses
-CLIENTFLAGS=$(CFLAGS) -lncurses -I./client/
+#CLIENTLIBS=-lncurses -ltinfo
+CLIENTFLAGS=$(CFLAGS) -I./client/
 SERVER_INCLUDES=include/protocol.h server/config.h server/evqueue.h server/game_stuff.h server/list.h server/logic_processes.h server/main_queue.h server/mq_state.h server/player_processes.h server/utils.h
 CLIENT_INCLUDES=include/protocol.h client/drawing_server.h client/game_screen.h client/message_stack.h
 
 all: server client
 
 clean:
-	rm dist/*
-	rm build/server/*.o
-	rm build/client/*.o
+	rm -f dist/*
+	rm -f build/server/*.o
+	rm -f build/client/*.o
 
 server: dist/server
 

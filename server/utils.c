@@ -5,7 +5,8 @@
 
 int sem_wait2(sem_t *sem)
 {
-    int status;
+    return sem_wait(sem);
+    /*int status;
 
     while ((status = sem_wait(sem)) < 0) {
         if (errno == EINTR) {
@@ -15,5 +16,5 @@ int sem_wait2(sem_t *sem)
         break;
     }
 
-    return status;
+    return status;*/
 }

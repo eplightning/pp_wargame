@@ -39,7 +39,6 @@ void spawn_logic_process(server_config_t *config, long sid, mq_state_t *state, e
     data_fd = shmget(IPC_PRIVATE, sizeof(game_data_t), 0600);
 
     if (data_fd < 0) {
-        // TODO: jakoś sensownie kończyć gre jak to się nie uda
         perror("Gra: Nie mozna utworzyc wspoldzielonej pamieci dla danych gry\n");
         return;
     }
@@ -48,7 +47,6 @@ void spawn_logic_process(server_config_t *config, long sid, mq_state_t *state, e
 
     // inicjalizacja
     if (init_game_data(config, data) < 0) {
-        // TODO: jakoś sensownie kończyć gre jak to się nie uda
         perror("Gra: Nie mozna utworzyc semafora dla danych gry\n");
         return;
     }
@@ -242,7 +240,7 @@ void spawn_events_process(game_data_t *data, long sid, mq_state_t *state, evqueu
     data->start_event_sent = 1;
 
     // zaczynamy clocki
-    double accumulator = 0.d;
+    double accumulator = 0.0;
     double time_old;
     struct timespec timer;
     keep_running = 1;
@@ -261,13 +259,13 @@ void spawn_events_process(game_data_t *data, long sid, mq_state_t *state, evqueu
         time_old = time_new;
 
         // nie mineła sekunda? to śpimy (1 sekunda - akumulator)
-        if (accumulator < 1.d) {
+        if (accumulator < 1.0) {
             usleep(1E6 - (accumulator * 1E6));
             continue;
         }
 
         // wybiła sekunda ....
-        accumulator -= 1.d;
+        accumulator -= 1.0;
 
         // bierzemy mutex
         if (sem_wait2(&data->mutex) < 0) {

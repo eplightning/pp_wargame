@@ -33,9 +33,9 @@ int start_main_queue(server_config_t config)
 
     if (mainq < 0) {
         if (errno == EEXIST) {
-            perror("BLAD: Kolejka wiadomosci z takim kluczem juz istnieje. Uzyj innej kolejki lub usun ja korzystajac z komendy ipcrm\n");
+            perror("BLAD: Kolejka wiadomosci z takim kluczem juz istnieje. Uzyj innej kolejki lub usun ja korzystajac z komendy ipcrm");
         } else {
-            perror("BLAD: Nie mozna utworzyc kolejki wiadomosci\n");
+            perror("BLAD: Nie mozna utworzyc kolejki wiadomosci");
         }
 
         return 1;

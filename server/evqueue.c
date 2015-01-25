@@ -21,9 +21,9 @@ int evqueue_init(evqueue_t *q)
 
 void evqueue_free(evqueue_t *q)
 {
-    sem_close(&q->access_semaphore);
-    sem_close(&q->available_semaphore);
-    sem_close(&q->free_semaphore);
+    sem_destroy(&q->access_semaphore);
+    sem_destroy(&q->available_semaphore);
+    sem_destroy(&q->free_semaphore);
 }
 
 void evqueue_add(evqueue_t *q, long type, long sid, const void *item, size_t item_size)

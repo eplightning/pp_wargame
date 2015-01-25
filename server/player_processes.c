@@ -119,8 +119,6 @@ void player_process_outgoing(long sid, int client_fd, int server_fd, evqueue_t *
         }
         // jeśli dostajemy zdarzenie z session id młodszym od nas to znaczy że gra już się skończyła a my z jakiegoś powodu się nie zamkneliśmy?
         else if (item->session_id > sid) {
-            // usuwamy kolejke (co sprawi że proces incoming też się zamknie)
-            msgctl(server_fd, IPC_RMID, 0);
             break;
         }
 
