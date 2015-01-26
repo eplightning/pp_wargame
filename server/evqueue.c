@@ -31,8 +31,15 @@ void evqueue_add(evqueue_t *q, long type, long sid, const void *item, size_t ite
     if (item_size > EVQUEUE_ITEM_SIZE)
         return;
 
-    sem_wait2(&q->free_semaphore);
-    sem_wait2(&q->access_semaphore);
+    int state = sem_wait2(&q->free_semaphore);
+
+    if (state < 0)
+        return;
+
+    state = sem_wait2(&q->access_semaphore);
+
+    if (state < 0)
+        return;
 
     unsigned int old_head = q->head++;
 
