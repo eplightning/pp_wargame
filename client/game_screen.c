@@ -166,6 +166,8 @@ void event_listener(int draw_queue, event_listener_data_t *data, int client_queu
                 snprintf(out.info, 50, "Nie masz tylu jednostek");
             } else if (msg->status == GAMEQUEUE_STATUS_CMD_ATTACK_OK) {
                 snprintf(out.info, 50, "Atak wyslany pomyslnie");
+            } else if (msg->status == GAMEQUEUE_STATUS_CMD_ATTACK_ALL_ZERO) {
+                snprintf(out.info, 50, "Nie mozna wyslac 0 jednostek do walki");
             } else {
                 snprintf(out.info, 50, "Nie udalo sie zlecic ataku z nieznanego powodu");
             }

@@ -1,6 +1,7 @@
 #include "player_processes.h"
 #include "evqueue.h"
 #include "protocol.h"
+#include "utils.h"
 
 #include <unistd.h>
 #include <sys/msg.h>
@@ -26,9 +27,9 @@ void spawn_player_process(long sid, int client_fd, int server_fd, evqueue_t *pla
 
     // Pierwszy podproces tego procesu oczekuje na wiadomości od gracza (komendy)
     if ((pid = fork()) == 0) {
-        signal(SIGINT, player_signal_handler);
-        signal(SIGTERM, player_signal_handler);
-        signal(SIGQUIT, player_signal_handler);
+        signal2(SIGINT, player_signal_handler);
+        signal2(SIGTERM, player_signal_handler);
+        signal2(SIGQUIT, player_signal_handler);
         player_process_incoming(sid, server_fd, logic_queue, seat);
         exit(0);
         return;
@@ -41,9 +42,9 @@ void spawn_player_process(long sid, int client_fd, int server_fd, evqueue_t *pla
     // Drugi podproces tego procesu czyta wew. kolejke serwera player_queue (którą wypełnia układ logiczny)
     // i wysyła do użytkownika wiadomości z niej
     if ((pid = fork()) == 0) {
-        signal(SIGINT, player_signal_handler);
-        signal(SIGTERM, player_signal_handler);
-        signal(SIGQUIT, player_signal_handler);
+        signal2(SIGINT, player_signal_handler);
+        signal2(SIGTERM, player_signal_handler);
+        signal2(SIGQUIT, player_signal_handler);
         player_process_outgoing(sid, client_fd, server_fd, player_queue);
         exit(0);
         return;

@@ -55,9 +55,9 @@ void spawn_logic_process(server_config_t *config, long sid, mq_state_t *state, e
 
     // proces obsługujący logike dla komend wysyłanych przez graczy (a dokładniej przesyłanych nam przez proces odbioru danych graczy)
     if ((pid = fork()) == 0) {
-        signal(SIGINT, logic_signal_handler);
-        signal(SIGTERM, logic_signal_handler);
-        signal(SIGQUIT, logic_signal_handler);
+        signal2(SIGINT, logic_signal_handler);
+        signal2(SIGTERM, logic_signal_handler);
+        signal2(SIGQUIT, logic_signal_handler);
         spawn_command_process(data, sid, player0_queue, player1_queue, logic_queue);
         exit(0);
         return;
@@ -70,9 +70,9 @@ void spawn_logic_process(server_config_t *config, long sid, mq_state_t *state, e
 
     // proces wydarzeń asynchronicznych
     if ((pid = fork()) == 0) {
-        signal(SIGINT, logic_signal_handler);
-        signal(SIGTERM, logic_signal_handler);
-        signal(SIGQUIT, logic_signal_handler);
+        signal2(SIGINT, logic_signal_handler);
+        signal2(SIGTERM, logic_signal_handler);
+        signal2(SIGQUIT, logic_signal_handler);
         spawn_events_process(data, sid, state, player0_queue, player1_queue, logic_queue);
         exit(0);
         return;
@@ -188,6 +188,10 @@ void spawn_command_process(game_data_t *data, long sid, evqueue_t *player0_queue
 
             // dziwny typ albo miejsca brakuje
             if ((cmd->type > UNIT_MAX_VALUE || cmd->type < UNIT_MIN_VALUE) || data->trainings.count >= TRAIN_LIST_CAPACITY) {
+                cmd_msg_train_ack_t response = create_cmd_train_ack(player, cmd->training_id, GAMEQUEUE_STATUS_CMD_TRAIN_UNKNOWN);
+                evqueue_add(playerq, response.id, sid, &response, sizeof(cmd_msg_train_ack_t));
+            // zero jednostek
+            } else if (cmd->count <= 0) {
                 cmd_msg_train_ack_t response = create_cmd_train_ack(player, cmd->training_id, GAMEQUEUE_STATUS_CMD_TRAIN_UNKNOWN);
                 evqueue_add(playerq, response.id, sid, &response, sizeof(cmd_msg_train_ack_t));
             // surowce
@@ -412,7 +416,7 @@ void spawn_events_process(game_data_t *data, long sid, mq_state_t *state, evqueu
                     state->seats[1].is_connected = 0;
                     state->game_in_progress = 0;
 
-                    printf("Gra: Sesja gry zakonczona\n");
+                    printf("LP: Sesja gry zakonczona\n");
 
                     // koniec zabawy
                     keep_running = 0;

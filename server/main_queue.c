@@ -4,6 +4,7 @@
 #include "evqueue.h"
 #include "player_processes.h"
 #include "logic_processes.h"
+#include "utils.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,6 +14,7 @@
 #include <sys/msg.h>
 #include <sys/shm.h>
 #include <sys/signal.h>
+#include <sys/wait.h>
 
 // modyfikowane przez sygnaly
 int keep_running_mq = 1;
@@ -23,10 +25,9 @@ int start_main_queue(server_config_t config)
     int children[6] = {0};
 
     // sygnaly
-    signal(SIGCHLD, SIG_IGN);
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    signal(SIGQUIT, signal_handler);
+    signal2(SIGINT, signal_handler);
+    signal2(SIGTERM, signal_handler);
+    signal2(SIGQUIT, signal_handler);
 
     // tworzymy glowna kolejke
     int mainq = msgget(config.main_queue_key, IPC_CREAT | IPC_EXCL | 0666);
@@ -176,7 +177,10 @@ int start_main_queue(server_config_t config)
         }
     }
 
-    printf("MQ: Koniec serwera");
+    printf("MQ: Koniec serwera\n");
+
+    // ubijamy dzieci
+    kill_children(children);
 
     // usuwamy IPC
     evqueue_free(player_queue[0]);
@@ -193,9 +197,6 @@ int start_main_queue(server_config_t config)
     if (state->seats[1].server_fd > 0)
         msgctl(state->seats[1].server_fd, IPC_RMID, 0);
 
-    // ubijamy dzieci
-    kill_children(children);
-
     return 0;
 }
 
@@ -208,9 +209,14 @@ void signal_handler(int type)
 
 void kill_children(int *children)
 {
+    int status;
+
     for (int i = 0; i < 6; i++) {
         if (children[i] > 0) {
             kill(children[i], SIGTERM);
+            printf("MQ: Zabijamy PID, i czekamy na status: %d\n", children[i]);
+            waitpid(children[i], &status, 0);
+            printf("MQ: PID %d zabity\n", children[i]);
         }
     }
 }
