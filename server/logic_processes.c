@@ -111,7 +111,7 @@ void spawn_command_process(game_data_t *data, long sid, evqueue_t *player0_queue
         // atak!
         if (item->type == EVQUEUE_LOGIC_TYPE_FIRST_ATTACK || item->type == EVQUEUE_LOGIC_TYPE_SECOND_ATTACK) {
             // bierzemy mutex (semafor) jako że będzie robić coś na danych gry
-            if (sem_wait2(&data->mutex) < 0) {
+            if (sem_wait(&data->mutex) < 0) {
                 break;
             }
 
@@ -171,7 +171,7 @@ void spawn_command_process(game_data_t *data, long sid, evqueue_t *player0_queue
         // trening
         } else if (item->type == EVQUEUE_LOGIC_TYPE_FIRST_TRAIN || item->type == EVQUEUE_LOGIC_TYPE_SECOND_TRAIN) {
             // bierzemy mutex (semafor) jako że będzie robić coś na danych gry
-            if (sem_wait2(&data->mutex) < 0) {
+            if (sem_wait(&data->mutex) < 0) {
                 break;
             }
 
@@ -272,7 +272,7 @@ void spawn_events_process(game_data_t *data, long sid, mq_state_t *state, evqueu
         accumulator -= 1.0;
 
         // bierzemy mutex
-        if (sem_wait2(&data->mutex) < 0) {
+        if (sem_wait(&data->mutex) < 0) {
             break;
         }
 

@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+// dodawanie elementu na liste
 int list_add(list_t *list, void *item)
 {
     if (list->capacity <= list->count) {
@@ -12,7 +13,8 @@ int list_add(list_t *list, void *item)
     char *pointer = &list->items;
 
     for (unsigned int i = 0; i < list->capacity; i++, pointer += list->item_size) {
-        // pierwszym elementem itemu listy jest is_valid
+        // pierwszym elementem itemu listy jest is_valid (zawsze)
+        // jeśli jest 0 to oznacza że miejsce jest wolne
         if (*pointer == 0) {
             memcpy(pointer, item, list->item_size);
             list->count++;
@@ -23,6 +25,7 @@ int list_add(list_t *list, void *item)
     return -1;
 }
 
+// iterator listy
 void *list_next(list_t *list, unsigned int *iterator)
 {
     if (list->count <= 0)

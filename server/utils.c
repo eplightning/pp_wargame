@@ -1,14 +1,8 @@
 #include "utils.h"
 
-#include <sys/errno.h>
-#include <semaphore.h>
 #include <sys/signal.h>
 
-int sem_wait2(sem_t *sem)
-{
-    return sem_wait(sem);
-}
-
+// signal bez ustawiania SA_RESTART
 int signal2(int signum, void (*action)(int))
 {
     struct sigaction opts;

@@ -58,6 +58,7 @@ void drawing_server_process(int queue, event_listener_data_t *data)
         int status = msgrcv(queue, incoming, sizeof(draw_msg_stack_t) - sizeof(long), 0, MSG_NOERROR);
 
         if (status < 0) {
+            // nie jestem pewien czy jest sens tutaj ignorować sygnały?
             if (errno == EINTR) {
                 continue;
             }
@@ -126,6 +127,6 @@ void drawing_server_process(int queue, event_listener_data_t *data)
 
     delwin(botwnd);
     delwin(topwnd);
-    
+
     message_stack_cleanup(stack);
 }

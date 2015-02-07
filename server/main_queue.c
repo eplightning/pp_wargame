@@ -13,11 +13,17 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/shm.h>
-#include <sys/signal.h>
 #include <sys/wait.h>
 
-// modyfikowane przez sygnaly
+// jak dostaniemy odpowiedni sygnał to kończymy prace serwera
 int keep_running_mq = 1;
+
+void signal_handler(int type)
+{
+    if (type == SIGINT || type == SIGTERM || type == SIGQUIT) {
+        keep_running_mq = 0;
+    }
+}
 
 int start_main_queue(server_config_t config)
 {
@@ -58,7 +64,7 @@ int start_main_queue(server_config_t config)
     init_state(state);
     state->main_queue = mainq;
 
-    // kolejki nasze serwerowe
+    // kolejki nasze serwerowe (3)
     int evq_mem = shmget(IPC_PRIVATE, sizeof(evqueue_t) * 3, 0600 | IPC_CREAT);
 
     if (evq_mem < 0) {
@@ -94,6 +100,7 @@ int start_main_queue(server_config_t config)
 
         if (status < 0) {
             if (errno == EINTR) {
+                // signal_handler ustawi keep_running_mq na 0 jeśli mamy się zakończyć
                 continue;
             } else {
                 perror("BLAD: Glowny proces serwera ma problemy z kolejka\n");
@@ -109,7 +116,7 @@ int start_main_queue(server_config_t config)
         }
 
         // bledy wejscia
-        if (strnlen(join_msg.player_agent, 34) > 32 || strnlen(join_msg.player_name, 34) > 32 || join_msg.preferred_seat > 1 || join_msg.preferred_seat < 0) {
+        if (strnlen(join_msg.player_agent, 33) > 32 || strnlen(join_msg.player_name, 33) > 32 || join_msg.preferred_seat > 1 || join_msg.preferred_seat < 0) {
             printf("MQ: Odrzucono polaczenie ze wzgledu na nieprawidlowe dane\n");
             join_ack_send_error(mainq, join_msg.request_id, MAINQUEUE_STATUS_JOIN_UNKNOWN);
             continue;
@@ -121,6 +128,9 @@ int start_main_queue(server_config_t config)
         if (!state->seats[0].is_connected && !state->seats[1].is_connected) {
             seat = join_msg.preferred_seat;
             next_sid++; // jeśli nikt nie był połączony to zaczynamy nową sesje
+
+            // ubijamy dzieci poprzedniej sesji
+            kill_children(children);
         } else {
             seat = state->seats[0].is_connected ? MAINQUEUE_SEAT_SECOND : MAINQUEUE_SEAT_FIRST;
         }
@@ -151,8 +161,8 @@ int start_main_queue(server_config_t config)
 
         // Sukces, tworzymy procesy komunikacji z klientem
         printf("MQ: Dolaczyl gracz \"%s\" uzywajacy klienta \"%s\" na miejsce %d\n", state->seats[seat].player_name
-                                                                                 , state->seats[seat].player_agent
-                                                                                 , seat);
+                                                                                   , state->seats[seat].player_agent
+                                                                                   , seat);
         state->seats[seat].is_connected = 1;
 
         spawn_player_process(next_sid, client_fd, state->seats[seat].server_fd, player_queue[seat], logic_queue, seat, children);
@@ -198,13 +208,6 @@ int start_main_queue(server_config_t config)
         msgctl(state->seats[1].server_fd, IPC_RMID, 0);
 
     return 0;
-}
-
-void signal_handler(int type)
-{
-    if (type == SIGINT || type == SIGTERM || type == SIGQUIT) {
-        keep_running_mq = 0;
-    }
 }
 
 void kill_children(int *children)

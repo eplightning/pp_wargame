@@ -135,5 +135,6 @@ void player_process_outgoing(long sid, int client_fd, int server_fd, evqueue_t *
         }
     }
 
+    // powinno zamknąć process_incoming, a nawet jak tego nie zrobi to zostanie zabite jak rozpocznie się kolejna sesja gry
     msgctl(server_fd, IPC_RMID, 0);
 }

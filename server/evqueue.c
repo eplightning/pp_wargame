@@ -31,12 +31,12 @@ void evqueue_add(evqueue_t *q, long type, long sid, const void *item, size_t ite
     if (item_size > EVQUEUE_ITEM_SIZE)
         return;
 
-    int state = sem_wait2(&q->free_semaphore);
+    int state = sem_wait(&q->free_semaphore);
 
     if (state < 0)
         return;
 
-    state = sem_wait2(&q->access_semaphore);
+    state = sem_wait(&q->access_semaphore);
 
     if (state < 0)
         return;
@@ -58,12 +58,12 @@ void evqueue_add(evqueue_t *q, long type, long sid, const void *item, size_t ite
 
 evqueue_item_t *evqueue_get(evqueue_t *q, long max_sid)
 {
-    int state = sem_wait2(&q->available_semaphore);
+    int state = sem_wait(&q->available_semaphore);
 
     if (state < 0)
         return 0;
 
-    state = sem_wait2(&q->access_semaphore);
+    state = sem_wait(&q->access_semaphore);
 
     if (state < 0)
         return 0;
