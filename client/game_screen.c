@@ -6,6 +6,7 @@
 #include <ncurses.h>
 
 #include <pthread.h>
+#include <semaphore.h>
 #include <sys/errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,6 +74,10 @@ void event_listener(int draw_queue, event_listener_data_t *data, int client_queu
 
         // pierwszym polem tego będzie long
         long *type = (long*) msg_bytes;
+
+        // semafor opuszczamy
+        if (sem_wait(&data->mutex) < 0)
+            break;
 
         if (*type == GAMEQUEUE_MSG_EVENT_UNIT_TRAINED) {
             event_msg_unit_trained_t *msg = (event_msg_unit_trained_t*) msg_bytes;
@@ -191,6 +196,9 @@ void event_listener(int draw_queue, event_listener_data_t *data, int client_queu
 
             msgsnd(draw_queue, &out, sizeof(draw_msg_stack_t) - sizeof(long), 0);
         }
+
+        // podnosimy
+        sem_post(&data->mutex);
     }
 
     // koniec
@@ -277,6 +285,12 @@ int game_main_loop(int client_queue, int server_queue, char seat)
     }
 
     event_listener_data_t *eldata = shmat(shared_mem, 0, 0);
+
+    // semafor dobrze by było już teraz zainicjować
+    if (sem_init(&eldata->mutex, 1, 1) < 0) {
+        perror("Nie udalo sie zainicjowac semafora");
+        return 1;
+    }
 
     // inicjalizacja
     initscr();
@@ -372,6 +386,7 @@ int game_main_loop(int client_queue, int server_queue, char seat)
     msgctl(client_queue, IPC_RMID, 0);
     msgctl(draw_queue, IPC_RMID, 0);
     shmctl(shared_mem, IPC_RMID, 0);
+    sem_destroy(&eldata->mutex);
     endwin();
 
     return 0;

@@ -217,9 +217,9 @@ void kill_children(int *children)
     for (int i = 0; i < 6; i++) {
         if (children[i] > 0) {
             kill(children[i], SIGTERM);
-            printf("MQ: Zabijamy PID, i czekamy na status: %d\n", children[i]);
+            printf("MQ: Zabijamy proces, i czekamy na status: %d\n", children[i]);
             waitpid(children[i], &status, 0);
-            printf("MQ: PID %d zabity\n", children[i]);
+            printf("MQ: Proces %d zabity, status: %d\n", children[i], status);
         }
     }
 }

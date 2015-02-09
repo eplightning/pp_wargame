@@ -8,16 +8,19 @@ CC=gcc
 
 # flagi kompilatora ogólne dla wszystkich .c
 CFLAGS=-c -O2 -Wall -std=gnu99 -I./include/
+#CFLAGS=-c -m32 -O2 -Wall -std=gnu99 -I./include/
 
 # flagi kompilatora dla serwera/klienta
 SERVERFLAGS=$(CFLAGS) -I./server/
 CLIENTFLAGS=$(CFLAGS) -I./client/
 
 # flagi dla linkera klienta/serwera
-SERVERLIBS=-pthread -lm
-CLIENTLIBS=-lncurses
+SERVERLIBS=-pthread -lm -lrt
+CLIENTLIBS=-pthread -lncurses
+#SERVERLIBS=-pthread -lm -m32
+#CLIENTLIBS=-lncurses -m32
 # zależy jak dystrubucja linkuje ncurses
-#CLIENTLIBS=-lncurses -ltinfo
+#CLIENTLIBS=-pthread -lncurses -ltinfo
 
 # wszystkie pliki .h
 SERVER_INCLUDES=include/protocol.h server/config.h server/evqueue.h server/game_stuff.h server/list.h server/logic_processes.h server/main_queue.h server/mq_state.h server/player_processes.h server/utils.h

@@ -285,6 +285,36 @@ void spawn_events_process(game_data_t *data, long sid, mq_state_t *state, evqueu
 
         // trening jednostek
         if (data->trainings.count > 0) {
+            train_list_item_t *training = 0;
+
+            // szukamy treningu gracza #1
+            if (data->player0.has_active_training == 0) {
+                do_find_next_training(&data->player0, MAINQUEUE_SEAT_FIRST, (list_t*) &data->trainings);
+            }
+
+            // szukamy treningu gracza #2
+            if (data->player1.has_active_training == 0) {
+                do_find_next_training(&data->player1, MAINQUEUE_SEAT_SECOND, (list_t*) &data->trainings);
+            }
+
+            // aktywny trening gracza #1
+            if (data->player0.has_active_training == 1) {
+                training = &data->trainings.trainings[data->player0.active_training];
+
+                do_train(&data->player0, player0_queue, training, (list_t*) &data->trainings, sid);
+            }
+
+            // aktywny trening gracza #2
+            if (data->player1.has_active_training == 1) {
+                training = &data->trainings.trainings[data->player1.active_training];
+
+                do_train(&data->player1, player1_queue, training, (list_t*) &data->trainings, sid);
+            }
+        }
+
+        // trening jednostek
+        // wersja gdzie wszystkie były współbieżnie :(
+        /*if (data->trainings.count > 0) {
             unsigned int iterator = 0;
 
             train_list_item_t *training = 0;
@@ -329,7 +359,7 @@ void spawn_events_process(game_data_t *data, long sid, mq_state_t *state, evqueu
                     }
                 }
             }
-        }
+        }*/
 
         // walka...
         if (data->attacks.count > 0) {
@@ -554,6 +584,8 @@ int init_game_data(server_config_t *config, game_data_t *data)
     data->player0.army.workers = 0;
     data->player0.resources = config->start_resources;
     data->player0.points = 0;
+    data->player0.has_active_training = 0;
+    data->player0.active_training = 0;
 
     // dane gracza #2
     data->player1.army.heavy = 0;
@@ -562,6 +594,8 @@ int init_game_data(server_config_t *config, game_data_t *data)
     data->player1.army.workers = 0;
     data->player1.resources = config->start_resources;
     data->player1.points = 0;
+    data->player1.has_active_training = 0;
+    data->player1.active_training = 0;
 
     // listy
     data->attacks.capacity = ATTACK_LIST_CAPACITY;
@@ -576,4 +610,59 @@ int init_game_data(server_config_t *config, game_data_t *data)
 
     // done
     return 0;
+}
+
+void do_find_next_training(player_data_t *player, char player_id, list_t *trainings)
+{
+    unsigned int iterator = 0;
+
+    train_list_item_t *training = 0;
+
+    while ((training = list_next(trainings, &iterator)) != 0) {
+        if (training->is_valid == 1 && training->player == player_id) {
+            player->active_training = iterator - 1; // jako że list_next zawsze zwraca index następnego elementu (w celach iteracji)
+            player->has_active_training = 1;
+
+            break;
+        }
+    }
+}
+
+void do_train(player_data_t *player, evqueue_t *playerq, train_list_item_t *training, list_t *list, long sid)
+{
+    if (training->is_valid == 0) {
+        player->has_active_training = 0;
+        player->active_training = 0;
+    } else {
+        training->seconds_elapsed++;
+
+        if (unit_train_time(training->unit_type) <= training->seconds_elapsed) {
+            training->seconds_elapsed = 0;
+            training->remaining--;
+
+            unsigned int units = 0;
+
+            switch (training->unit_type) {
+                case UNIT_WORKER:
+                    units = ++player->army.workers;
+                    break;
+                case UNIT_LIGHT_INFANTRY:
+                    units = ++player->army.light;
+                    break;
+                case UNIT_HEAVY_INFANTRY:
+                    units = ++player->army.heavy;
+                    break;
+                case UNIT_HORSEMEN:
+                    units = ++player->army.horsemen;
+            }
+
+            send_event_trained(playerq, training, units, sid);
+
+            if (training->remaining <= 0) {
+                list_remove(list, (char*) training);
+                player->has_active_training = 0;
+                player->active_training = 0;
+            }
+        }
+    }
 }

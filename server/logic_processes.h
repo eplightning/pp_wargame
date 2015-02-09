@@ -16,6 +16,8 @@ typedef struct player_data {
     int resources;
     int points;
     war_army_t army;
+    char has_active_training;
+    unsigned int active_training;
 } player_data_t;
 
 typedef struct attack_list_item {
@@ -78,6 +80,9 @@ int init_game_data(server_config_t *config, game_data_t *data);
 void spawn_logic_process(server_config_t *config, long sid, mq_state_t *state, evqueue_t *player0_queue, evqueue_t *player1_queue, evqueue_t *logic_queue, int *children);
 void spawn_command_process(game_data_t *data, long sid, evqueue_t *player0_queue, evqueue_t *player1_queue, evqueue_t *logic_queue);
 void spawn_events_process(game_data_t *data, long sid, mq_state_t *state, evqueue_t *player0_queue, evqueue_t *player1_queue, evqueue_t *logic_queue);
+
+void do_find_next_training(player_data_t *player, char player_id, list_t *trainings);
+void do_train(player_data_t *player, evqueue_t *playerq, train_list_item_t *training, list_t *list, long sid);
 
 #endif // LOGIC_PROCESSES_H
 

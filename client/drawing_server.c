@@ -4,6 +4,7 @@
 
 #include <ncurses.h>
 
+#include <semaphore.h>
 #include <sys/errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -20,6 +21,10 @@ void refresh_top_window(WINDOW *wnd, event_listener_data_t *data, message_stack_
         wmove(wnd, 1, 2);
         wprintw(wnd, "Oczekiwanie na poczatek gry ...");
     } else {
+        // semafor opuszczamy
+        if (sem_wait(&data->mutex) < 0)
+            return;
+
         wmove(wnd, 1, 2);
         wprintw(wnd, "Seat: %d", data->seat);
         wmove(wnd, 1, 10);
@@ -31,6 +36,9 @@ void refresh_top_window(WINDOW *wnd, event_listener_data_t *data, message_stack_
         wmove(wnd, 3, 2);
         wprintw(wnd, "Lekka: %d Ciezka: %d Jezdzcy: %d Robotnicy: %d", data->army.light,
                 data->army.heavy, data->army.horsemen, data->army.workers);
+
+        // semafor podnosimy
+        sem_post(&data->mutex);
 
         // eventy
         for (int i = 0; i < stack->current_lines; i++) {
