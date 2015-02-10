@@ -41,15 +41,30 @@ char get_preffered_seat()
     printf("# Podaj preferowana pozycje (0 - pierwszy gracz, 1 - drugi): \n");
 
     char seat = 0;
+    int status;
 
-    read(0, &seat, 1);
+    status = read(0, &seat, 1);
+
+    if (status < 0) {
+        perror("Blad czytania seata");
+    }
 
     if (seat == 0) {
-        read(0, &seat, 1);
+        status = read(0, &seat, 1);
+
+        if (status < 0) {
+            perror("Blad czytania seata");
+        }
+
         return MAINQUEUE_SEAT_FIRST;
     }
 
-    read(0, &seat, 1);
+    status = read(0, &seat, 1);
+
+    if (status < 0) {
+        perror("Blad czytania seata");
+    }
+
     return MAINQUEUE_SEAT_SECOND;
 }
 

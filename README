@@ -1,0 +1,140 @@
+Projekt na SOP2 - Gra wojna
+Bartosz Sławianowski 117205
+
+Opisy serwera oraz klienta dostępne poniżej
+Opis protokołu (klient-server, wspólnego): PROTOCOL
+
+Makefile dołączony więc do kompilacji wystarczy komenda make.
+Pliki wykonywalne klienta i serwera lecą do katalogu dist (pliki client, server odpowiednio)
+Wiadomo serwer powinien być odpalony zanim spróbujemy programami klienckimi się połączyć
+
+Jeśli występuje błąd przy linkowaniu z ncurses to prawdopodobnie wystaczy odkomentowanie 23 linii i zakomentowanie 20 linii
+Testowane na Arch Linuxie, Fedorze 20, paru pochodnych Ubuntu. openSuSE wymagał zmiany powyżej ze względu na dziwne linkowanie biblioteki ncurses w tejże dystrubucji. Testowane kompilatory to GCC 4.8.2, GCC 4.9.2, Clang 3.5.1
+
+------------
+OPIS KLIENTA
+------------
+Pliki:
+    drawing_server.c - proces rysowania
+    game_screen.c - proces główny po połączeniu
+    main.c - proces główny przed połączeniem
+    message_stack.c - prosty statyczny stack do stringów
+
+Procesy:
+    - Główny (najpierw łączy się według danych podawanych przez użytkownika, po połączeniu zajmuje się czytaniem inputu użytkownika (i wysyłaniem komend) i tworzy dwa kolejne procesy)
+    - Komunikacja z serwerem (czeka na wiadomości od serwera gry)
+    - Serwer rysowania (wyłączny dostęp do wyjścia konsoli, dostaje polecenia rysowania od procesów #1 i #2)
+
+Pamięc współdzielona:
+    typedef struct event_listener_data {
+        char enemy_name[33];
+        int points[2];
+        int resources;
+        war_army_t army;
+        char seat;
+        char game_started;
+        sem_t mutex;
+    } event_listener_data_t;
+
+    Generalnie jest po to ,żeby w kolejce do serwera rysowania nie wysyłać za każdym razem kopii tych danych.
+    Zabezpieczona mutexem (semaforem).
+
+Komunikacja #1 i #2 procesu z serwerem rysowania gry:
+
+// #2 proces wysyła jak następują zmiany danych w górnym okienku
+#define DRAW_SERVER_REFRESH         1
+// #2 proces wysyła żeby dodać do logów komunikat
+#define DRAW_SERVER_STACK_APPEND    2
+// #1 proces wysyła żeby narysować główne menu
+#define DRAW_SERVER_MAIN_MENU       3
+// #1 proces wysyła żeby narysować okienko wyboru liczby
+#define DRAW_SERVER_NUMBER_SELECT   4
+// #1 proces wysyła żeby narysować okienko wyboru jednostki
+#define DRAW_SERVER_UNIT_SELECT     5
+// #1 proces wysyła w przypadku komendy "Koniec", kończy proces rysowania
+#define DRAW_SERVER_SHUTDOWN        6
+
+------------
+OPIS SERWERA
+------------
+Pliki:
+    evqueue.c - implementacja kolejki cyklicznej
+    game_stuff.c - funkcje gry (koszty jednostek, obliczanie strat itd.)
+    list.c - prosta implementacja listy statycznej
+    logic_processes.c - procesy logiczne
+    main.c - wczytuje konfiguracje i przekazuje kontrole do głównej kolejki
+    main_queue.c - główna kolejka
+    player_processes.c - procesy komunikacji z graczami
+    utils.c - funkcje pomocnicze (signal za pomocą (POSIXowego) sigaction gdyż domyślnie signal używa flagi SA_RESTART która w naszym wypadku przeszkadza gdyż powoduje że sem_wait nie zwraca EINTR jak sygnał nastąpi)
+
+Procesy:
+    - Główna kolejka (odbiera polecenia join i wysyła join_ack zgodnie z protokołem)
+    - Sesja gry:
+        - 2 * Proces wysyłający komunikaty użytkownikowi (bierze z kolejki do której dokładają procesy logiczny) do client_queue
+        - 2 * Proces odbierający komendy od użytkowników (i przekazuje do kolejki procesu logicznego)
+        - Proces logiczny który obsługuje komendy użytkowników (odbiera z procesu wyżej opisanego)
+        - Proces logiczny który zajmuje się asynchronicznymi wydarzeniami
+
+Współdzielona pamięć:
+
+    Stan głównej kolejki:
+
+    typedef struct mq_state {
+        int main_queue;
+
+        // dopóki jeden to nie przyjmujemy dalszych połączeń
+        // semafor zbędny, nie ma przebiegu takiego że główna kolejka przepuści dopóki gra się nie skończyła
+        char game_in_progress;
+
+        // identyfikator obecnej sesji gry
+        // takie zabezpieczenie jakby kolejna gra się zaczeła ,a procesy starej sesji gry nie zdążyły się zakończyć z jakiegoś powodu
+        // testowałem i generalnie takiej sytuacji nie ma, ale zostawiłem na wszelki wypadek
+        long game_sid;
+
+        // informacje o połączonych graczach, również semafor niepotrzebny ze względu na to jak działa program
+        mq_seat_t seats[2];
+    } mq_state_t;
+
+    Kolejki (cykliczne) wydarzeń (3 w programie, 2 w której gromadzą się wiadomości do wysłania użytkownikom przez proces komunikacji, 1 w której gromadzą się polecenia dla procesu logicznego), do problemu konsument/producent:
+
+    typedef struct evqueue {
+        // głowa i ogon kolejki (skąd wyciągać wydarzenia, gdzie dokładać kolejne wydarzenia)
+        unsigned int head;
+        unsigned int tail;
+
+        // dostępne miejsca, mutex, wolne miejsca
+        sem_t available_semaphore;
+        sem_t access_semaphore;
+        sem_t free_semaphore;
+
+        // statyczna max. wielkość kolejki dla ułatwienia implementacji
+        evqueue_item_t items[EVQUEUE_CAPACITY];
+    } evqueue_t;
+
+    Dane współdzielone pomiędzy podprocesy komponentu logicznego serwera:
+
+    typedef struct game_data {
+        // dane graczy
+        player_data_t player0;
+        player_data_t player1;
+
+        // proste statyczne liste które przechowują max do obecnie trwających 255 ataków/treningów
+        // można oczywiście zwiększyć tą liczbe define'm
+        attack_list_t attacks;
+        train_list_t trainings;
+
+        // mutex
+        sem_t mutex;
+
+        // czy gra się już zaczeła (dwóch kolesi się połączyło i dostali komunikat o początku) - komendy graczy są ignorowane dopóki to jest 0
+        char start_event_sent;
+    } game_data_t;
+
+Semafory:
+
+    - Dla kolejek wydarzeń (evqueue wyżej)
+        available_semaphore ilość dostępnych elementów do wyciągnięcia z kolejki (konsument)
+        free_semaphore ilość wolnego mijesca na kolejce (producent)
+        access_semaphore sekcja krytyczna
+    - Dla danych współdzielonych przez podprocesy komponentu logicznego
+        mutex - żeby tylko jeden czytał/zapisywał w danym momencie (listę treningu, liste walk, dane graczy)

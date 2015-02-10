@@ -143,6 +143,10 @@ void event_listener(int draw_queue, event_listener_data_t *data, int client_queu
             }
 
             msgsnd(draw_queue, &out, sizeof(draw_msg_stack_t) - sizeof(long), 0);
+
+            // podnosimy
+            sem_post(&data->mutex);
+
             break;
         } else if (*type == GAMEQUEUE_MSG_EVENT_GAME_STARTED) {
             event_msg_game_started_t *msg = (event_msg_game_started_t*) msg_bytes;
